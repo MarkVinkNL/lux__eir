@@ -1,0 +1,4 @@
+.config
+deploy.log
+*.log
+.DS_Store

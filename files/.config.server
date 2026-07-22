@@ -1,0 +1,30 @@
+EIR_SYS_ENV=production
+EIR_SYS_GIT=/usr/bin/git
+EIR_SYS_PHP=/usr/bin/php
+EIR_SYS_COMPOSER=composer
+
+EIR_SITE_FOLDER=app
+EIR_IMAGES_FOLDER=images
+EIR_FILES_FOLDER=files
+
+EIR_GIT_REMOTE_BRANCH=production
+EIR_GIT_REPOSITORY=git@github.com:MarkVinkNL/ivory.nl.git
+
+# LARAVEL OPTIONS (only keys present in Application env templates are written)
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://ivory.nl
+
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=
+DB_USERNAME=
+DB_PASSWORD=
+
+# SESSION_DOMAIN=
+# IMAGES_LOCATION=local_images
+# MOLLIE_API_KEY=xxx
+# GOOGLE_MAPS_API_KEY=xxx
+# GRECAPTCHA_KEY=xxx
+# GRECAPTCHA_SECRET=xxx
+# ANALYTICS_ID=
