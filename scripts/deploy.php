@@ -147,11 +147,14 @@ function eirEnsureAppKey(CLI $cli, string $php, string $cwd, array $envFormat): 
   execOrFail($php . ' artisan key:generate', $cli);
 }
 
-function eirCloneApp(CLI $cli, string $git, string $repository, string $branch, string $target): void
+function eirCloneApp(CLI $cli, string $git, string $repository, string $branch, string $target, string $sysEnv): void
 {
-  $cli->echo('Cloning ' . $repository . ' (' . $branch . ') → ' . $target);
+  // Local: full fetch refspec so other branches are available for development.
+  // Server: single-branch keeps Deploy clones small.
+  $singleBranch = ($sysEnv === 'local') ? '' : ' --single-branch';
+  $cli->echo('Cloning ' . $repository . ' (' . $branch . ')' . ($singleBranch === '' ? ' [all remotes]' : ' [single-branch]') . ' → ' . $target);
   execOrFail(
-    $git . ' clone -b ' . escapeshellarg($branch) . ' --single-branch ' . escapeshellarg($repository) . ' ' . escapeshellarg($target),
+    $git . ' clone -b ' . escapeshellarg($branch) . $singleBranch . ' ' . escapeshellarg($repository) . ' ' . escapeshellarg($target),
     $cli
   );
 
@@ -170,7 +173,7 @@ function eirInitialInstall(CLI $cli, array $config, string $home, string $site, 
     $cli->error('Site folder unexpectedly exists')->exit(1);
   }
 
-  eirCloneApp($cli, $git, $repository, $branch, $site);
+  eirCloneApp($cli, $git, $repository, $branch, $site, $sysEnv);
   $envFormat = eirCompileEnv($cli, $config, $site);
   eirComposerInstall($cli, $composer, $sysEnv, $site);
   eirEnsureAppKey($cli, $php, $site, $envFormat);
@@ -260,7 +263,7 @@ function eirServerDeploy(
     execOrFail('rm -rf ' . escapeshellarg($new), $cli);
   }
 
-  eirCloneApp($cli, $git, $repository, $branch, $new);
+  eirCloneApp($cli, $git, $repository, $branch, $new, $sysEnv);
   $envFormat = eirCompileEnv($cli, $config, $new, $site);
   eirComposerInstall($cli, $composer, $sysEnv, $new);
   eirEnsureAppKey($cli, $php, $new, $envFormat);
