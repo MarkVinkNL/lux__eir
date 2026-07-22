@@ -121,7 +121,7 @@ function findNamedFile(string $root, string $filename): ?string
 
     $path = $file->getPathname();
     foreach ($skip as $segment) {
-      if (str_contains($path, $DS . $segment . $DS)) {
+      if (str_contains($path, DIRECTORY_SEPARATOR . $segment . DIRECTORY_SEPARATOR)) {
         continue 2;
       }
     }

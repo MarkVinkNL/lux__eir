@@ -128,11 +128,21 @@ class CLI
 
     $this->settings = [];
     if (file_exists($configFile)) {
-      $parsed = parse_ini_file($configFile, false, INI_SCANNER_RAW);
-      $this->settings = is_array($parsed) ? $parsed : [];
+      $parsed = @parse_ini_file($configFile, false, INI_SCANNER_RAW);
+      if ($parsed === false) {
+        $this->error('Could not parse ' . $configFile);
+        $this->error('PHP INI rules: no parentheses in comments; quote URLs like APP_URL="http://..."');
+        $this->exit(1);
+      }
+      $this->settings = $parsed;
     }
 
     if (empty($this->settings)) {
+      if (file_exists($configFile)) {
+        $this->error('Config file exists but has no values: ' . $configFile);
+        $this->exit(1);
+      }
+
       $this->error('No config values found');
 
       $env_type = 'server';

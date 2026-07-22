@@ -82,7 +82,9 @@ function eirCompileEnv(CLI $cli, array $config, string $targetDir, ?string $live
 {
   $cli->echo('Generating ENV file for ' . $targetDir);
 
+  // .env.example supplies the key schema; later files overwrite values.
   $envFormat = array_merge(
+    parseEnvFile(findNamedFile($targetDir, '.env.example')),
     parseEnvFile(findNamedFile($targetDir, '.env.base')),
     parseEnvFile(findNamedFile($targetDir, '.env.default')),
     parseEnvFile(findNamedFile($targetDir, '.env.template'))
@@ -111,7 +113,7 @@ function eirCompileEnv(CLI $cli, array $config, string $targetDir, ?string $live
   }
 
   if (empty($envFormat)) {
-    $cli->error('No env keys found (missing .env.base/.env.default/.env.template?)')->exit(1);
+    $cli->error('No env keys found (missing .env.base/.env.default/.env.example/.env.template?)')->exit(1);
   }
 
   arrayToEnvFile($envFormat, $targetDir . DIRECTORY_SEPARATOR . '.env');
@@ -182,14 +184,16 @@ function eirInitialInstall(CLI $cli, array $config, string $home, string $site, 
 /**
  * Local refresh when app/ exists.
  */
-function eirLocalExisting(CLI $cli, array $config, string $site, string $composer, string $sysEnv): void
+function eirLocalExisting(CLI $cli, array $config, string $site, string $composer, string $sysEnv, string $php): void
 {
   $cli->echo('Local refresh');
-  eirCompileEnv($cli, $config, $site, $site);
+  $envFormat = eirCompileEnv($cli, $config, $site, $site);
 
   if (!is_dir($site . DIRECTORY_SEPARATOR . 'vendor')) {
     eirComposerInstall($cli, $composer, $sysEnv, $site);
   }
+
+  eirEnsureAppKey($cli, $php, $site, $envFormat);
 
   $cli->echo('Local refresh complete.')->exit(0);
 }
@@ -290,7 +294,7 @@ if (!is_dir($site)) {
 }
 
 if ($sysEnv === 'local') {
-  eirLocalExisting($cli, $config, $site, $composer, $sysEnv);
+  eirLocalExisting($cli, $config, $site, $composer, $sysEnv, $php);
 }
 
 eirServerDeploy($cli, $config, $home, $site, $new, $backup, $siteFolder, $git, $php, $composer, $sysEnv, $repository, $branch);
