@@ -16,11 +16,10 @@ $cli->argument(['-h', '-help', '--help'], function () use ($cli) {
     ->echo('Eir — Environment deploy tool')
     ->echo('')
     ->echo('  php eir/run.php          Initial install (no app/), local refresh, or server Deploy')
+    ->echo('  php eir/run.php -u       Upgrade Environment template + Eir (does not touch app/)')
     ->echo('  php eir/run.php -f       Force Deploy even if last_commit matches remote')
     ->echo('  php eir/run.php -r       Rollback: swap backup/ ↔ app/')
     ->echo('  php eir/run.php -s       Silent')
-    ->echo('')
-    ->echo('  From the Environment folder: ./upgrade  (template + Eir; not app/)')
     ->exit(0);
 });
 
@@ -53,7 +52,7 @@ $cli
 /**
  * Upgrade: pull Environment template + Eir submodule. Does not touch Application (app/).
  */
-$cli->argument('upgrade', function () use ($cli, $home, $eir, $git, $DS, $siteFolder) {
+$cli->argument(['-u', '-upgrade'], function () use ($cli, $home, $eir, $git, $DS, $siteFolder) {
   $cli->cd($home);
 
   if (!execCheck($git . ' rev-parse --git-dir 2>&1')) {

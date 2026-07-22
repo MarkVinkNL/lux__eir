@@ -23,16 +23,11 @@ Eir lives as a git submodule at `eir/` inside an Environment (template) folder:
 
 ```bash
 php eir/run.php          # initial install if no app/; else local refresh or server Deploy
+php eir/run.php -u       # upgrade Environment template + Eir (does not touch app/)
 php eir/run.php -f       # force Deploy (ignore last_commit gate)
 php eir/run.php -r       # rollback: swap backup/ ↔ app/
 php eir/run.php -s       # silent
 php eir/run.php -h       # help
-```
-
-From the Environment folder, prefer the wrapper (no `php eir/run.php`):
-
-```bash
-./upgrade                # pull Environment template + Eir (does not touch app/)
 ```
 
 ### First run
@@ -63,12 +58,10 @@ Migrate failure aborts without swap. Rollback leaves `last_commit` unchanged.
 
 Pulls the Environment template and resets `eir/` to `origin/main`. Does **not** touch Application (`app/`).
 
-From the Environment folder:
-
 ```bash
-./upgrade
+php eir/run.php -u
 ```
 
-(`upgrade` / `upgrade.cmd` call `php eir/run.php upgrade`.)
+Also accepted: `-upgrade`.
 
 If Eir alone moved ahead of the template’s submodule pointer, commit the new `eir` SHA in the Environment template when you want that bump shared.
