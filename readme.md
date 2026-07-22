@@ -29,6 +29,12 @@ php eir/run.php -s       # silent
 php eir/run.php -h       # help
 ```
 
+From the Environment folder, prefer the wrapper (no `php eir/run.php`):
+
+```bash
+./upgrade                # pull Environment template + Eir (does not touch app/)
+```
+
 ### First run
 
 If `{environment}/.config` is missing, Eir copies `files/.config.local` or `files/.config.server` and exits. Edit `.config`, then run again.
@@ -53,14 +59,16 @@ Commit gate → clone to `new_app/` → env → composer → migrate → swap `a
 
 Migrate failure aborts without swap. Rollback leaves `last_commit` unchanged.
 
-## Update Eir
+## Upgrade Environment + Eir
+
+Pulls the Environment template and resets `eir/` to `origin/main`. Does **not** touch Application (`app/`).
 
 From the Environment folder:
 
 ```bash
-cd eir
-git fetch --all
-git reset --hard origin/main
+./upgrade
 ```
 
-Or bump the submodule pointer in the Environment template repo.
+(`upgrade` / `upgrade.cmd` call `php eir/run.php upgrade`.)
+
+If Eir alone moved ahead of the template’s submodule pointer, commit the new `eir` SHA in the Environment template when you want that bump shared.

@@ -19,6 +19,8 @@ $cli->argument(['-h', '-help', '--help'], function () use ($cli) {
     ->echo('  php eir/run.php -f       Force Deploy even if last_commit matches remote')
     ->echo('  php eir/run.php -r       Rollback: swap backup/ ↔ app/')
     ->echo('  php eir/run.php -s       Silent')
+    ->echo('')
+    ->echo('  From the Environment folder: ./upgrade  (template + Eir; not app/)')
     ->exit(0);
 });
 
@@ -47,6 +49,35 @@ $cli
   ->echo('| site : ' . $site)
   ->echo('| env  : ' . $sysEnv)
   ->echo('---------------------------------------------------------------' . PHP_EOL);
+
+/**
+ * Upgrade: pull Environment template + Eir submodule. Does not touch Application (app/).
+ */
+$cli->argument('upgrade', function () use ($cli, $home, $eir, $git, $DS, $siteFolder) {
+  $cli->cd($home);
+
+  if (!execCheck($git . ' rev-parse --git-dir 2>&1')) {
+    $cli->error('Environment root is not a git repository')->exit(1);
+  }
+
+  $cli->echo('Pulling Environment template...');
+  execOrFail($git . ' pull', $cli);
+
+  $eirGit = $eir . $DS . '.git';
+  if (!is_dir($eirGit) && !is_file($eirGit)) {
+    $cli->echo('Initializing Eir submodule...');
+    execOrFail($git . ' submodule update --init -- eir', $cli);
+  }
+
+  $cli->cd($eir);
+  $cli->echo('Updating Eir to origin/main...');
+  execOrFail($git . ' fetch --all', $cli);
+  execOrFail($git . ' reset --hard origin/main', $cli);
+
+  $cli
+    ->echo('Upgrade complete. Application (' . $siteFolder . '/) was not touched.')
+    ->exit(0);
+});
 
 /**
  * Rollback: swap backup ↔ app. Does not change last_commit or reverse migrations.
