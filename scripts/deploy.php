@@ -85,7 +85,6 @@ function eirCompileEnv(CLI $cli, array $config, string $targetDir, ?string $live
   // .env.example supplies the key schema; later files overwrite values.
   $envFormat = array_merge(
     parseEnvFile(findNamedFile($targetDir, '.env.example')),
-    parseEnvFile(findNamedFile($targetDir, '.env.base')),
     parseEnvFile(findNamedFile($targetDir, '.env.default')),
     parseEnvFile(findNamedFile($targetDir, '.env.template'))
   );
@@ -113,7 +112,7 @@ function eirCompileEnv(CLI $cli, array $config, string $targetDir, ?string $live
   }
 
   if (empty($envFormat)) {
-    $cli->error('No env keys found (missing .env.base/.env.default/.env.example/.env.template?)')->exit(1);
+    $cli->error('No env keys found (missing .env.example/.env.default/.env.template?)')->exit(1);
   }
 
   arrayToEnvFile($envFormat, $targetDir . DIRECTORY_SEPARATOR . '.env');
