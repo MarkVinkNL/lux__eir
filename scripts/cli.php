@@ -114,8 +114,7 @@ class CLI
   public function log($message): self
   {
     if (empty($this->logFile)) {
-      $this->echo('No log file set');
-      return $this->exit();
+      return $this;
     }
 
     file_put_contents($this->logFile, $message . PHP_EOL, FILE_APPEND);
@@ -146,7 +145,7 @@ class CLI
       $this->error('No config values found');
 
       $env_type = 'server';
-      if ($this->promptBool("Is this a local environment?  Type 'yes' for local, all other responses choose server: ", 'yes')) {
+      if ($this->promptBool("Is this a local environment? Type yes or local (anything else = server): ", 'yes')) {
         $env_type = 'local';
       }
 
@@ -229,7 +228,7 @@ class CLI
     $handle = fopen('php://stdin', 'r');
     $line = fgets($handle);
 
-    return trim($line) == $check;
+    return eirPromptBoolMatches($line === false ? '' : $line, (string) $check);
   }
 }
 

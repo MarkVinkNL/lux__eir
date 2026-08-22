@@ -32,7 +32,7 @@ function eirCreateWorkspaceConfig(CLI $cli, string $eir, string $home, string $D
   }
 
   $envType = 'server';
-  if ($cli->promptBool("Is this a local environment? Type 'yes' for local, all other responses choose server: ", 'yes')) {
+  if ($cli->promptBool("Is this a local environment? Type yes or local (anything else = server): ", 'yes')) {
     $envType = 'local';
   }
 
@@ -111,6 +111,14 @@ eirCreateWorkspaceConfig($cli, $eir, $home, $DS);
 
 $cli->setupConfig($home . $DS . '.config');
 $git = $cli->config('EIR_SYS_GIT');
+
+if (!eirCommandRunnable($git)) {
+  $hint = 'Set EIR_SYS_GIT to a git binary that exists on this machine.';
+  if (PHP_OS_FAMILY === 'Windows' && str_contains((string) $git, '/')) {
+    $hint = 'On Windows, use the local template (type yes or local) so EIR_SYS_GIT=git. Delete .config and run install again if the server template was copied by mistake.';
+  }
+  $cli->error('Git not found: ' . $git . PHP_EOL . $hint)->exit(1);
+}
 
 eirEnsureGithubSsh($cli);
 

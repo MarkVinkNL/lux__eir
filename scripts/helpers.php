@@ -2,6 +2,33 @@
 
 $DS = DIRECTORY_SEPARATOR;
 
+function eirCommandRunnable(string $binary): bool
+{
+  if ($binary === '') {
+    return false;
+  }
+
+  exec(escapeshellarg($binary) . ' --version 2>&1', $output, $code);
+
+  return $code === 0;
+}
+
+function eirPromptBoolMatches(string $answer, string $check): bool
+{
+  $answer = strtolower(trim($answer));
+  $check = strtolower($check);
+
+  if ($answer === $check) {
+    return true;
+  }
+
+  if ($check === 'yes') {
+    return in_array($answer, ['y', 'local'], true);
+  }
+
+  return false;
+}
+
 function execCheck($command, $status = 0, $output = false)
 {
   exec($command, $execOutput, $execReturnVar);
