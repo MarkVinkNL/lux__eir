@@ -1,0 +1,16 @@
+# Ignore everything in images/ and files/, keep .gitkeep
+images/*
+!images/.gitkeep
+files/*
+!files/.gitkeep
+
+# Drop-in bootstrap (canonical copy lives in eir/)
+/install.php
+
+# Environment runtime (Eir)
+.config
+last_commit
+deploy.log
+backup/
+backup--old/
+new_app/

@@ -234,3 +234,180 @@ function writeLastCommit(string $sitePath, string $home, string $gitBin, $cli): 
     $cli->error('Could not write last_commit')->exit(1);
   }
 }
+
+function eirUserSshDir(): string
+{
+  $home = getenv('HOME') ?: getenv('USERPROFILE');
+  if (!$home) {
+    return '';
+  }
+
+  return rtrim($home, '\\/') . DIRECTORY_SEPARATOR . '.ssh';
+}
+
+function eirTcpReachable(string $host, int $port, int $timeout = 5): bool
+{
+  $fp = @fsockopen($host, $port, $errno, $errstr, $timeout);
+  if (!is_resource($fp)) {
+    return false;
+  }
+
+  fclose($fp);
+  return true;
+}
+
+/**
+ * GitHub's `ssh -T` returns 1 even on success. Trust the output text, not the exit code.
+ */
+function eirGithubSshAuthenticated(): bool
+{
+  exec('ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -T git@github.com 2>&1', $output, $code);
+  $text = implode("\n", $output);
+
+  return str_contains($text, 'successfully authenticated');
+}
+
+function eirEnsureGithubKnownHosts(CLI $cli): void
+{
+  $sshDir = eirUserSshDir();
+  if ($sshDir === '') {
+    $cli->error('Could not resolve home directory for ~/.ssh')->exit(1);
+  }
+
+  if (!is_dir($sshDir) && !mkdir($sshDir, 0700, true) && !is_dir($sshDir)) {
+    $cli->error('Could not create ' . $sshDir)->exit(1);
+  }
+
+  $knownHosts = $sshDir . DIRECTORY_SEPARATOR . 'known_hosts';
+  $existing = is_file($knownHosts) ? (string) file_get_contents($knownHosts) : '';
+  if (str_contains($existing, 'github.com')) {
+    return;
+  }
+
+  exec('ssh-keyscan -t ed25519,ecdsa,rsa github.com 2>&1', $scanOut, $scanCode);
+  $keys = [];
+  foreach ($scanOut as $line) {
+    $line = trim($line);
+    if ($line === '' || str_starts_with($line, '#')) {
+      continue;
+    }
+    if (str_contains($line, 'github.com')) {
+      $keys[] = $line;
+    }
+  }
+
+  if ($keys === []) {
+    $cli->error('ssh-keyscan did not return GitHub host keys')->exit(1);
+  }
+
+  $append = implode(PHP_EOL, $keys) . PHP_EOL;
+  if (file_put_contents($knownHosts, $append, FILE_APPEND) === false) {
+    $cli->error('Could not write ' . $knownHosts)->exit(1);
+  }
+}
+
+function eirFindExistingGithubPubkey(): ?string
+{
+  $sshDir = eirUserSshDir();
+  if ($sshDir === '') {
+    return null;
+  }
+
+  foreach (['id_ed25519.pub', 'id_rsa.pub', 'id_ecdsa.pub'] as $name) {
+    $path = $sshDir . DIRECTORY_SEPARATOR . $name;
+    if (is_file($path)) {
+      return $path;
+    }
+  }
+
+  return null;
+}
+
+function eirShowOrCreateSshKey(CLI $cli): string
+{
+  $existing = eirFindExistingGithubPubkey();
+  if ($existing !== null) {
+    $cli->echo('Using existing public key: ' . $existing);
+    return $existing;
+  }
+
+  $sshDir = eirUserSshDir();
+  $keyFile = $sshDir . DIRECTORY_SEPARATOR . 'id_ed25519';
+  $comment = 'eir@' . (gethostname() ?: 'workspace');
+
+  $cli->echo('No SSH key found. Generating ' . $keyFile);
+  execOrFail(
+    'ssh-keygen -t ed25519 -f ' . escapeshellarg($keyFile) . ' -N ' . escapeshellarg('') . ' -C ' . escapeshellarg($comment),
+    $cli
+  );
+
+  $pub = $keyFile . '.pub';
+  if (!is_file($pub)) {
+    $cli->error('ssh-keygen did not write ' . $pub)->exit(1);
+  }
+
+  return $pub;
+}
+
+function eirEnsureGithubSsh(CLI $cli): void
+{
+  if (eirGithubSshAuthenticated()) {
+    return;
+  }
+
+  $cli->echo('Checking GitHub SSH...');
+
+  if (!eirTcpReachable('github.com', 22)) {
+    if (eirTcpReachable('github.com', 443)) {
+      $cli->error('github.com is reachable on HTTPS (443) but not SSH (22). Key generation will not help.')->exit(1);
+    }
+    $cli->error('Cannot reach github.com. Check network/DNS/firewall.')->exit(1);
+  }
+
+  eirEnsureGithubKnownHosts($cli);
+
+  if (eirGithubSshAuthenticated()) {
+    return;
+  }
+
+  while (!eirGithubSshAuthenticated()) {
+    $pub = eirShowOrCreateSshKey($cli);
+    $cli->echo('');
+    $cli->echo('Add this public key to GitHub (Settings → SSH and GPG keys, or a deploy key):');
+    $cli->echo('');
+    $cli->echo(trim((string) file_get_contents($pub)));
+    $cli->echo('');
+    $cli->promptEnter('Then press Enter to retry, or Ctrl+C to abort.');
+  }
+
+  $cli->echo('GitHub SSH authentication succeeded.');
+}
+
+function eirSetConfigValue(string $file, string $key, string $value): void
+{
+  $contents = (string) file_get_contents($file);
+  $line = $key . '=' . $value;
+  $pattern = '/^' . preg_quote($key, '/') . '=.*$/m';
+
+  if (preg_match($pattern, $contents)) {
+    $contents = preg_replace_callback($pattern, function () use ($line) {
+      return $line;
+    }, $contents, 1);
+  } else {
+    $contents = rtrim($contents) . PHP_EOL . $line . PHP_EOL;
+  }
+
+  if (file_put_contents($file, $contents) === false) {
+    throw new RuntimeException('Could not write ' . $file);
+  }
+}
+
+function eirReadConfigValue(string $file, string $key): ?string
+{
+  $parsed = @parse_ini_file($file, false, INI_SCANNER_RAW);
+  if (!is_array($parsed) || !isset($parsed[$key])) {
+    return null;
+  }
+
+  return (string) $parsed[$key];
+}

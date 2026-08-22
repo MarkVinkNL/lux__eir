@@ -199,7 +199,30 @@ class CLI
     return $this->settings[$variable] ?? $default;
   }
 
-  private function promptBool($msg, $check)
+  public function promptLine(string $msg, ?string $default = null): string
+  {
+    $suffix = ($default !== null && $default !== '') ? ' [' . $default . ']' : '';
+    echo $msg . $suffix . ': ';
+
+    $handle = fopen('php://stdin', 'r');
+    $line = fgets($handle);
+    $line = $line === false ? '' : trim($line);
+
+    if ($line === '' && $default !== null) {
+      return $default;
+    }
+
+    return $line;
+  }
+
+  public function promptEnter(string $msg = 'Press Enter to retry, or Ctrl+C to abort.'): void
+  {
+    echo $msg . PHP_EOL;
+    $handle = fopen('php://stdin', 'r');
+    fgets($handle);
+  }
+
+  public function promptBool($msg, $check)
   {
     echo $msg;
 

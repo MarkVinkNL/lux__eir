@@ -1,6 +1,12 @@
 <?php
 
+if (PHP_SAPI !== 'cli') {
+  fwrite(STDERR, "Run from the command line: php eir/run.php\n");
+  exit(1);
+}
+
 include_once __DIR__ . '/helpers.php';
+
 include_once __DIR__ . '/cli.php';
 
 $eir = dirname(realpath(dirname(__FILE__)));
@@ -54,6 +60,7 @@ $cli
  */
 $cli->argument(['-u', '-upgrade'], function () use ($cli, $home, $eir, $git, $DS, $siteFolder) {
   $cli->cd($home);
+  eirEnsureGithubSsh($cli);
 
   if (!execCheck($git . ' rev-parse --git-dir 2>&1')) {
     $cli->error('Environment root is not a git repository')->exit(1);
@@ -179,6 +186,8 @@ function eirEnsureAppKey(CLI $cli, string $php, string $cwd, array $envFormat): 
 
 function eirCloneApp(CLI $cli, string $git, string $repository, string $branch, string $target, string $sysEnv): void
 {
+  eirEnsureGithubSsh($cli);
+
   // Local: full fetch refspec so other branches are available for development.
   // Server: single-branch keeps Deploy clones small.
   $singleBranch = ($sysEnv === 'local') ? '' : ' --single-branch';
