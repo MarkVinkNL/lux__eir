@@ -21,9 +21,11 @@ php install.php
 
 The copy of `install.php` in the Environment root is not committed. Edit `.config` (database, URL, secrets), then `php eir/run.php`.
 
+Servers always start this way. Do not clone a local workspace onto a server.
+
 ## Layout
 
-Eir lives as a git submodule at `eir/` inside an Environment (template) folder:
+Eir lives as a git submodule at `eir/` inside an Environment folder:
 
 ```
 {environment}/
@@ -38,11 +40,13 @@ Eir lives as a git submodule at `eir/` inside an Environment (template) folder:
   new_app/         # ephemeral during Deploy
 ```
 
+The Environment git repo is a **local workspace**. Locally `app/` is a submodule of that repo so editors show Application git. On servers `app/` is a plain clone so Deploy can swap the directory.
+
 ## Usage
 
 ```bash
 php eir/run.php          # initial install if no app/; else local refresh or server Deploy
-php eir/run.php -u       # upgrade Environment template + Eir (does not touch app/)
+php eir/run.php -u       # upgrade Eir (workspace pull only if a remote exists; does not touch app/)
 php eir/run.php -f       # force Deploy (ignore last_commit gate)
 php eir/run.php -r       # rollback: swap backup/ ↔ app/
 php eir/run.php -s       # silent
@@ -55,17 +59,16 @@ If `{environment}/.config` is missing, Eir copies `files/.config.local` or `file
 
 ### Initial install (`app/` missing)
 
-Same on local, staging, and production:
-
 1. Clone `EIR_GIT_REPOSITORY` @ `EIR_GIT_REMOTE_BRANCH` → `app/`
-2. Compile `.env`
-3. `composer install`
-4. `artisan migrate --force` + `cache:clear`
-5. Write `last_commit`
+2. Local only: register `app/` as a workspace submodule
+3. Compile `.env`
+4. `composer install`
+5. `artisan migrate --force` + `cache:clear`
+6. Write `last_commit`
 
 ### Local (`EIR_SYS_ENV=local`, `app/` exists)
 
-Compile `.env`; `composer install` if `vendor/` is missing.
+Register `app/` as a workspace submodule if it is not one yet. Compile `.env`; `composer install` if `vendor/` is missing.
 
 ### Server (`staging` / `production`, `app/` exists)
 
@@ -73,9 +76,9 @@ Commit gate → clone to `new_app/` → env → composer → migrate → swap `a
 
 Migrate failure aborts without swap. Rollback leaves `last_commit` unchanged.
 
-## Upgrade Environment + Eir
+## Upgrade Eir
 
-Pulls the Environment template and resets `eir/` to `origin/main`. Does **not** touch Application (`app/`).
+Resets `eir/` to `origin/main`. Pulls the workspace only when that git repo has a remote. Does **not** touch Application (`app/`).
 
 ```bash
 php eir/run.php -u
@@ -83,4 +86,4 @@ php eir/run.php -u
 
 Also accepted: `-upgrade`.
 
-If Eir alone moved ahead of the template’s submodule pointer, commit the new `eir` SHA in the Environment template when you want that bump shared.
+A local workspace may have a remote for backup or another machine. Servers typically have none; `-u` still updates Eir.

@@ -22,7 +22,7 @@ $cli->argument(['-h', '-help', '--help'], function () use ($cli) {
     ->echo('Eir — Environment deploy tool')
     ->echo('')
     ->echo('  php eir/run.php          Initial install (no app/), local refresh, or server Deploy')
-    ->echo('  php eir/run.php -u       Upgrade Environment template + Eir (does not touch app/)')
+    ->echo('  php eir/run.php -u       Upgrade Eir (workspace pull only if a remote exists; does not touch app/)')
     ->echo('  php eir/run.php -f       Force Deploy even if last_commit matches remote')
     ->echo('  php eir/run.php -r       Rollback: swap backup/ ↔ app/')
     ->echo('  php eir/run.php -s       Silent')
@@ -56,7 +56,8 @@ $cli
   ->echo('---------------------------------------------------------------' . PHP_EOL);
 
 /**
- * Upgrade: pull Environment template + Eir submodule. Does not touch Application (app/).
+ * Upgrade Eir. Workspace git is local-only: pull only if a remote exists.
+ * Does not touch Application (app/), including a local app submodule.
  */
 $cli->argument(['-u', '-upgrade'], function () use ($cli, $home, $eir, $git, $DS, $siteFolder) {
   $cli->cd($home);
@@ -66,8 +67,18 @@ $cli->argument(['-u', '-upgrade'], function () use ($cli, $home, $eir, $git, $DS
     $cli->error('Environment root is not a git repository')->exit(1);
   }
 
-  $cli->echo('Pulling Environment template...');
-  execOrFail($git . ' pull', $cli);
+  if (eirWorkspaceHasRemote($git)) {
+    $cli->echo('Pulling workspace...');
+    exec($git . ' pull', $pullOutput, $pullCode);
+    if ($pullCode !== 0) {
+      $cli->echo('Workspace pull skipped (no upstream, or pull failed). Continuing with Eir update.');
+      if (!empty($pullOutput)) {
+        $cli->echo(implode(PHP_EOL, $pullOutput));
+      }
+    }
+  } else {
+    $cli->echo('No workspace remote — updating Eir only.');
+  }
 
   $eirGit = $eir . $DS . '.git';
   if (!is_dir($eirGit) && !is_file($eirGit)) {
@@ -202,10 +213,22 @@ function eirCloneApp(CLI $cli, string $git, string $repository, string $branch, 
 }
 
 /**
- * Initial install when app/ is missing — same on all Environments.
+ * Initial install when app/ is missing.
+ * Clone is the same; locally the clone is then registered as a workspace submodule.
  */
-function eirInitialInstall(CLI $cli, array $config, string $home, string $site, string $git, string $php, string $composer, string $sysEnv, string $repository, string $branch): void
-{
+function eirInitialInstall(
+  CLI $cli,
+  array $config,
+  string $home,
+  string $site,
+  string $siteFolder,
+  string $git,
+  string $php,
+  string $composer,
+  string $sysEnv,
+  string $repository,
+  string $branch
+): void {
   $cli->echo('Initial install: ' . $site . ' is missing');
 
   if (is_dir($site)) {
@@ -213,6 +236,11 @@ function eirInitialInstall(CLI $cli, array $config, string $home, string $site, 
   }
 
   eirCloneApp($cli, $git, $repository, $branch, $site, $sysEnv);
+
+  if ($sysEnv === 'local') {
+    eirEnsureLocalAppSubmodule($cli, $git, $home, $siteFolder, $repository, $branch);
+  }
+
   $envFormat = eirCompileEnv($cli, $config, $site);
   eirComposerInstall($cli, $composer, $sysEnv, $site);
   eirEnsureAppKey($cli, $php, $site, $envFormat);
@@ -225,9 +253,21 @@ function eirInitialInstall(CLI $cli, array $config, string $home, string $site, 
 /**
  * Local refresh when app/ exists.
  */
-function eirLocalExisting(CLI $cli, array $config, string $site, string $composer, string $sysEnv, string $php): void
-{
+function eirLocalExisting(
+  CLI $cli,
+  array $config,
+  string $home,
+  string $site,
+  string $siteFolder,
+  string $git,
+  string $composer,
+  string $sysEnv,
+  string $php,
+  string $repository,
+  string $branch
+): void {
   $cli->echo('Local refresh');
+  eirEnsureLocalAppSubmodule($cli, $git, $home, $siteFolder, $repository, $branch);
   $envFormat = eirCompileEnv($cli, $config, $site, $site);
 
   if (!is_dir($site . DIRECTORY_SEPARATOR . 'vendor')) {
@@ -331,11 +371,11 @@ function eirServerDeploy(
 // --- Main -------------------------------------------------------------------
 
 if (!is_dir($site)) {
-  eirInitialInstall($cli, $config, $home, $site, $git, $php, $composer, $sysEnv, $repository, $branch);
+  eirInitialInstall($cli, $config, $home, $site, $siteFolder, $git, $php, $composer, $sysEnv, $repository, $branch);
 }
 
 if ($sysEnv === 'local') {
-  eirLocalExisting($cli, $config, $site, $composer, $sysEnv, $php);
+  eirLocalExisting($cli, $config, $home, $site, $siteFolder, $git, $composer, $sysEnv, $php, $repository, $branch);
 }
 
 eirServerDeploy($cli, $config, $home, $site, $new, $backup, $siteFolder, $git, $php, $composer, $sysEnv, $repository, $branch);

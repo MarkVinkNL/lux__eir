@@ -438,3 +438,110 @@ function eirReadConfigValue(string $file, string $key): ?string
 
   return (string) $parsed[$key];
 }
+
+function eirGitLinkInIndex(string $git, string $path): bool
+{
+  exec($git . ' ls-files -s -- ' . escapeshellarg($path), $output, $code);
+
+  return $code === 0
+    && count($output) === 1
+    && str_starts_with($output[0], '160000 ');
+}
+
+function eirIndexHasRegularPath(string $git, string $path): bool
+{
+  exec($git . ' ls-files -s -- ' . escapeshellarg($path), $output, $code);
+  if ($code !== 0 || $output === []) {
+    return false;
+  }
+
+  return !(count($output) === 1 && str_starts_with($output[0], '160000 '));
+}
+
+function eirWorkspaceHasRemote(string $git): bool
+{
+  exec($git . ' remote', $output, $code);
+
+  return $code === 0 && $output !== [];
+}
+
+/**
+ * Local only: register Application as a submodule of the Environment git repo
+ * so editors show Application git. Servers must keep a plain clone so Deploy can swap app/.
+ */
+function eirEnsureLocalAppSubmodule(
+  CLI $cli,
+  string $git,
+  string $home,
+  string $siteFolder,
+  string $repository,
+  string $branch
+): void {
+  $cli->cd($home);
+
+  if (!preg_match('/^[A-Za-z0-9._-]+$/', $siteFolder)) {
+    $cli->error('EIR_SITE_FOLDER is not a safe submodule name: ' . $siteFolder)->exit(1);
+  }
+
+  if (!execCheck($git . ' rev-parse --git-dir 2>&1')) {
+    $cli->error('Environment root is not a git repository — cannot add ' . $siteFolder . '/ as a submodule')->exit(1);
+  }
+
+  $site = $home . DIRECTORY_SEPARATOR . $siteFolder;
+  $gitMarker = $site . DIRECTORY_SEPARATOR . '.git';
+  if (!is_file($gitMarker) && !is_dir($gitMarker)) {
+    $cli->error($siteFolder . '/ is not a git repository — cannot register as a submodule')->exit(1);
+  }
+
+  if (eirGitLinkInIndex($git, $siteFolder)) {
+    $cli->echo($siteFolder . '/ is already a workspace submodule');
+    return;
+  }
+
+  $cli->echo('Registering ' . $siteFolder . '/ as a workspace submodule');
+
+  execOrFail($git . ' config -f .gitmodules submodule.' . $siteFolder . '.path ' . escapeshellarg($siteFolder), $cli);
+  execOrFail($git . ' config -f .gitmodules submodule.' . $siteFolder . '.url ' . escapeshellarg($repository), $cli);
+  execOrFail($git . ' config -f .gitmodules submodule.' . $siteFolder . '.branch ' . escapeshellarg($branch), $cli);
+
+  if (eirIndexHasRegularPath($git, $siteFolder)) {
+    execOrFail($git . ' rm -r --cached -- ' . escapeshellarg($siteFolder), $cli);
+  }
+
+  $sha = execValue($git . ' -C ' . escapeshellarg($site) . ' rev-parse HEAD');
+  if (!is_string($sha) || !preg_match('/^[0-9a-f]{7,40}$/i', $sha)) {
+    $cli->error('Could not read HEAD of ' . $siteFolder)->exit(1);
+  }
+
+  execOrFail(
+    $git . ' update-index --add --replace --cacheinfo 160000,' . $sha . ',' . $siteFolder,
+    $cli
+  );
+
+  execOrFail($git . ' submodule init -- ' . escapeshellarg($siteFolder), $cli);
+  execOrFail($git . ' config submodule.' . $siteFolder . '.url ' . escapeshellarg($repository), $cli);
+  execOrFail($git . ' config submodule.' . $siteFolder . '.active true', $cli);
+
+  exec($git . ' submodule absorbgitdirs -- ' . escapeshellarg($siteFolder), $absorbOut, $absorbCode);
+  if ($absorbCode === 0) {
+    $cli->echo('Moved ' . $siteFolder . '/.git into .git/modules/' . $siteFolder);
+  }
+
+  execOrFail($git . ' add -- .gitmodules ' . escapeshellarg($siteFolder), $cli);
+
+  $status = execValue($git . ' status --porcelain -- .gitmodules ' . escapeshellarg($siteFolder));
+  if ($status === false) {
+    return;
+  }
+
+  exec(
+    $git . ' commit -m ' . escapeshellarg('Add Application submodule') . ' -- .gitmodules ' . escapeshellarg($siteFolder),
+    $commitOut,
+    $commitCode
+  );
+  if ($commitCode === 0) {
+    $cli->echo('Committed Application submodule');
+  } else {
+    $cli->echo('Application submodule is staged (commit it when ready)');
+  }
+}

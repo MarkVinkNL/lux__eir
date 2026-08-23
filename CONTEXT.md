@@ -8,12 +8,12 @@ Deploy and runtime context for Ivory Environments: the durable folder that hosts
 A durable folder that hosts one running site (local Herd checkout, `staging/`, or `production/`). It owns `.config`, Eir, media folders, and the live Application directory.
 _Avoid_: Home, server root, APP_ENV
 
-**Environment template**:
-The git project that defines Environment shape (`eir` submodule, `images/`, `files/`) without Application source code.
-_Avoid_: Monorepo, project root (when meaning the Application)
+**Workspace**:
+The Environment git repository on a local machine. Created by `install.php`. Tracks Eir, skills, workspace files, and (locally) the Application submodule. Not cloned onto servers.
+_Avoid_: Environment template (when meaning something servers pull), monorepo
 
 **Application**:
-The Laravel site from its own git repository (`ivory.nl`), living in `app/` (and briefly in `new_app/` / `backup/` during Deploy).
+The Laravel site from its own git repository (`ivory.nl`), living in `app/` (and briefly in `new_app/` / `backup/` during Deploy). Locally `app/` is a submodule of the workspace; on servers it is a plain clone.
 _Avoid_: Site, public_html, codebase (ambiguous)
 
 **Eir**:
@@ -21,7 +21,7 @@ The PHP CLI deploy tool (`lux__eir`), consumed as the `eir/` submodule inside an
 _Avoid_: Lunae, Solis, deployer
 
 **Initial install**:
-When `app/` is missing — the same flow on every Environment: clone Application → env compile → composer → migrate → write `last_commit`.
+When `app/` is missing — obtain Application, compile env, composer, migrate, write `last_commit`. Locally the clone is then registered as a workspace submodule.
 _Avoid_: Bootstrap (unless meaning only the clone step), setup
 
 **Deploy**:
