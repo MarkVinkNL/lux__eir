@@ -154,8 +154,9 @@ function eirCompileEnv(CLI $cli, array $config, string $targetDir, ?string $live
   $liveEnv = $preserveFrom . DIRECTORY_SEPARATOR . '.env';
   if (file_exists($liveEnv)) {
     $original = parseEnvFile($liveEnv);
-    if (!empty($original['APP_KEY'])) {
-      $envFormat['APP_KEY'] = preg_replace('/=""/', '=', $original['APP_KEY']);
+    $preservedKey = eirNormalizeAppKey((string) ($original['APP_KEY'] ?? ''));
+    if ($preservedKey !== '') {
+      $envFormat['APP_KEY'] = $preservedKey;
     }
   }
 
@@ -186,13 +187,20 @@ function eirMigrateAndClear(CLI $cli, string $php, string $cwd): void
 
 function eirEnsureAppKey(CLI $cli, string $php, string $cwd, array $envFormat): void
 {
-  if (!empty($envFormat['APP_KEY'])) {
+  if (eirAppKeyIsPresent($envFormat['APP_KEY'] ?? null)) {
     return;
   }
+
+  $envFile = $cwd . DIRECTORY_SEPARATOR . '.env';
+  eirWriteUnquotedEmptyAppKey($envFile);
 
   chdir($cwd);
   $cli->echo('artisan key:generate');
   execOrFail($php . ' artisan key:generate', $cli);
+
+  if (eirRepairGeneratedAppKey($envFile)) {
+    $cli->echo('Repaired quoted APP_KEY leftover from key:generate');
+  }
 }
 
 function eirCloneApp(CLI $cli, string $git, string $repository, string $branch, string $target, string $sysEnv): void

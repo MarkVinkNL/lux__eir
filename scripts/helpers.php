@@ -172,6 +172,64 @@ function parseEnvFile(?string $filePath): array
 }
 
 /**
+ * Strip wrapping/trailing quotes from APP_KEY.
+ *
+ * arrayToEnvFile writes empty strings as APP_KEY="". Laravel's key:generate
+ * replaces /^APP_KEY=/ and leaves the quotes: APP_KEY=base64:…=""
+ */
+function eirNormalizeAppKey(string $value): string
+{
+  return trim(trim($value), "\"'");
+}
+
+function eirAppKeyIsPresent(?string $value): bool
+{
+  return eirNormalizeAppKey((string) $value) !== '';
+}
+
+/**
+ * Write APP_KEY= with no quotes so artisan key:generate can replace the line.
+ */
+function eirWriteUnquotedEmptyAppKey(string $envPath): void
+{
+  if (!is_file($envPath)) {
+    return;
+  }
+
+  $contents = file_get_contents($envPath);
+  if ($contents === false) {
+    return;
+  }
+
+  $updated = preg_replace('/^APP_KEY=.*$/m', 'APP_KEY=', $contents, 1);
+  if (is_string($updated) && $updated !== $contents) {
+    file_put_contents($envPath, $updated);
+  }
+}
+
+/**
+ * Repair APP_KEY=base64:…="" left by artisan key:generate.
+ */
+function eirRepairGeneratedAppKey(string $envPath): bool
+{
+  if (!is_file($envPath)) {
+    return false;
+  }
+
+  $contents = file_get_contents($envPath);
+  if ($contents === false) {
+    return false;
+  }
+
+  $repaired = preg_replace('/^(APP_KEY=base64:[A-Za-z0-9+\/]+=*)"+$/m', '$1', $contents, 1);
+  if (!is_string($repaired) || $repaired === $contents) {
+    return false;
+  }
+
+  return file_put_contents($envPath, $repaired) !== false;
+}
+
+/**
  * Convert a key-value array to a .env file.
  */
 function arrayToEnvFile(array $data, string $filePath): bool
@@ -209,6 +267,16 @@ function arrayToEnvFile(array $data, string $filePath): bool
       }
 
       if (is_string($value)) {
+        // Empty APP_KEY must stay unquoted. Quoted APP_KEY="" makes
+        // `php artisan key:generate` produce APP_KEY=base64:…=""
+        if ($key === 'APP_KEY') {
+          $value = eirNormalizeAppKey($value);
+          if ($value === '') {
+            $escapedValue = '';
+            break;
+          }
+        }
+
         $escapedValue = str_replace(['\\', '"'], ['\\\\', '\"'], $value);
         $escapedValue = "\"{$escapedValue}\"";
         break;
