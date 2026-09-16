@@ -2,6 +2,11 @@ EIR_SYS_ENV=local
 EIR_SYS_GIT=git
 EIR_SYS_PHP=php
 EIR_SYS_COMPOSER=composer
+# Import binaries. Defaults: mysql, mysqldump, ssh, tar. Set full paths if not on PATH, e.g. Herd:
+# EIR_SYS_MYSQL="C:\Users\you\.config\herd\bin\mysql.bat"
+# EIR_SYS_MYSQLDUMP="C:\Users\you\.config\herd\bin\mysqldump.bat"
+# EIR_SYS_SSH=ssh
+# EIR_SYS_TAR=tar
 
 EIR_SITE_FOLDER=app
 EIR_IMAGES_FOLDER=images
@@ -9,6 +14,20 @@ EIR_FILES_FOLDER=files
 
 EIR_GIT_REMOTE_BRANCH=main
 EIR_GIT_REPOSITORY=git@github.com:MarkVinkNL/ivory.nl.git
+
+# Import source. Local only; never written to app/.env. Prompted if missing when running -i / -m.
+# EIR_IMPORT_DB_HOST=
+# EIR_IMPORT_DB_PORT=3306
+# EIR_IMPORT_DB_DATABASE=
+# EIR_IMPORT_DB_USERNAME=
+# EIR_IMPORT_DB_PASSWORD=
+# EIR_IMPORT_SSH_HOST=
+# EIR_IMPORT_SSH_PORT=22
+# EIR_IMPORT_SSH_USER=
+# EIR_IMPORT_SSH_PATH=production
+# EIR_IMPORT_SSH_IDENTITY=
+# EIR_IMPORT_SSH_IMAGES_FOLDER=public_images
+# EIR_IMPORT_SSH_FILES_FOLDER=public_files
 
 # LARAVEL / Application - only keys present in env templates are written
 # Do not set APP_KEY here; Eir preserves or generates it

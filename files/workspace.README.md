@@ -43,6 +43,8 @@ php eir/run.php          # initial install / local refresh / server Deploy
 php eir/run.php -u       # upgrade Eir (workspace pull only if a remote exists; does not touch app/)
 php eir/run.php -f       # force Deploy
 php eir/run.php -r       # rollback
+php eir/run.php -i       # Import remote MySQL into local DB_* (local only)
+php eir/run.php -m       # Import remote images/ and files/ (local only)
 php eir/run.php -h       # help
 ```
 

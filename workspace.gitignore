@@ -3,6 +3,8 @@ images/*
 !images/.gitkeep
 files/*
 !files/.gitkeep
+public_images/
+public_files/
 
 # Drop-in bootstrap (canonical copy lives in eir/)
 /install.php
@@ -14,3 +16,8 @@ deploy.log
 backup/
 backup--old/
 new_app/
+eir-media-import/
+eir-media-import.tar
+eir-media-import.err
+images--old/
+files--old/

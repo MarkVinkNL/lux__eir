@@ -25,6 +25,8 @@ $cli->argument(['-h', '-help', '--help'], function () use ($cli) {
     ->echo('  php eir/run.php -u       Upgrade Eir (workspace pull only if a remote exists; does not touch app/)')
     ->echo('  php eir/run.php -f       Force Deploy even if last_commit matches remote')
     ->echo('  php eir/run.php -r       Rollback: swap backup/ ↔ app/')
+    ->echo('  php eir/run.php -i       Import: dump remote MySQL into local DB_* (local only)')
+    ->echo('  php eir/run.php -m       Import: copy remote images/ and files/ (local only)')
     ->echo('  php eir/run.php -s       Silent')
     ->exit(0);
 });
@@ -122,6 +124,38 @@ $cli->argument(['-r', '-rollback', '--rollback'], function () use ($cli, $home, 
 
   $cli->echo('Rollback complete. last_commit unchanged.')->exit(0);
 });
+
+/**
+ * Import: dump remote MySQL and/or copy remote images/ + files/ (local only).
+ * When app/ is missing, Initial install handles -i / -m instead (auto-Import).
+ */
+$wantDbImport = argCheck(['-i', '-import']);
+$wantMediaImport = argCheck(['-m', '-media', '-import-media']);
+
+if ($wantDbImport || $wantMediaImport) {
+  if (argCheck(['-s', '-silent'])) {
+    $cli->error('Import is interactive — cannot combine -i/-m with -s')->exit(1);
+  }
+
+  if ($sysEnv !== 'local') {
+    $cli->error('Import is local-only (EIR_SYS_ENV must be local)')->exit(1);
+  }
+
+  // No app/ yet: fall through to Initial install, which auto-Imports when -i/-m is set.
+  if (is_dir($site)) {
+    $cli->cd($home);
+    if ($wantDbImport) {
+      $cli->echo('Import into ' . $siteFolder . '/ database');
+      eirImportDatabase($cli, $home);
+      eirMigrateAndClear($cli, $php, $site);
+    }
+    if ($wantMediaImport) {
+      $cli->echo('Import media into images/ and files/');
+      eirImportMedia($cli, $home);
+    }
+    $cli->echo('Import complete.')->exit(0);
+  }
+}
 
 /**
  * Compile .env into $targetDir/.env from templates + config overlay + optional APP_KEY preserve.
@@ -223,6 +257,7 @@ function eirCloneApp(CLI $cli, string $git, string $repository, string $branch, 
 /**
  * Initial install when app/ is missing.
  * Clone is the same; locally the clone is then registered as a workspace submodule.
+ * Local may Import an external database and/or remote media instead of starting empty.
  */
 function eirInitialInstall(
   CLI $cli,
@@ -252,6 +287,41 @@ function eirInitialInstall(
   $envFormat = eirCompileEnv($cli, $config, $site);
   eirComposerInstall($cli, $composer, $sysEnv, $site);
   eirEnsureAppKey($cli, $php, $site, $envFormat);
+
+  $doImport = false;
+  $doMediaImport = false;
+  if ($sysEnv === 'local') {
+    if (argCheck(['-i', '-import']) || argCheck(['-m', '-media', '-import-media'])) {
+      if (argCheck(['-s', '-silent'])) {
+        $cli->error('Import is interactive — cannot combine -i/-m with -s')->exit(1);
+      }
+    }
+    if (argCheck(['-i', '-import'])) {
+      $doImport = true;
+    } elseif (!argCheck(['-s', '-silent'])) {
+      $doImport = $cli->promptBool(
+        'Import an external database instead of an empty migrate? Type yes: ',
+        'yes'
+      );
+    }
+    if (argCheck(['-m', '-media', '-import-media'])) {
+      $doMediaImport = true;
+    } elseif (!argCheck(['-s', '-silent'])) {
+      $doMediaImport = $cli->promptBool(
+        'Import remote images/ and files/? Type yes: ',
+        'yes'
+      );
+    }
+  }
+
+  if ($doImport) {
+    eirImportDatabase($cli, $home);
+  }
+
+  if ($doMediaImport) {
+    eirImportMedia($cli, $home);
+  }
+
   eirMigrateAndClear($cli, $php, $site);
   writeLastCommit($site, $home, $git, $cli);
 
@@ -283,6 +353,7 @@ function eirLocalExisting(
   }
 
   eirEnsureAppKey($cli, $php, $site, $envFormat);
+  eirEnsurePublicMediaLinks($cli, $home, $site);
 
   $cli->echo('Local refresh complete.')->exit(0);
 }

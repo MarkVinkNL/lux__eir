@@ -35,3 +35,7 @@ _Avoid_: Undo, revert (git sense)
 **Env compile**:
 Building `app/.env` by merging Application env templates, overlaying matching `.config` keys, and preserving `APP_KEY`.
 _Avoid_: Envsubst, dotenv build
+
+**Import**:
+Replacing this local Environment’s Application database and/or media folders (`images/`, `files/`) from a remote Environment (`php eir/run.php -i` and/or `-m`).
+_Avoid_: Sync, lux:sync, Rollback, restore

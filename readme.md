@@ -49,6 +49,8 @@ php eir/run.php          # initial install if no app/; else local refresh or ser
 php eir/run.php -u       # upgrade Eir (workspace pull only if a remote exists; does not touch app/)
 php eir/run.php -f       # force Deploy (ignore last_commit gate)
 php eir/run.php -r       # rollback: swap backup/ ↔ app/
+php eir/run.php -i       # Import: dump remote MySQL into local DB_* (local only)
+php eir/run.php -m       # Import: copy remote images/ and files/ (local only)
 php eir/run.php -s       # silent
 php eir/run.php -h       # help
 ```
@@ -63,8 +65,19 @@ If `{environment}/.config` is missing, Eir copies `files/.config.local` or `file
 2. Local only: register `app/` as a workspace submodule
 3. Compile `.env`
 4. `composer install`
-5. `artisan migrate --force` + `cache:clear`
-6. Write `last_commit`
+5. Local only: optional Import (prompt, or auto when `-i` / `-m`) — dump remote MySQL into `DB_*` and/or copy remote `images/` + `files/`
+6. `artisan migrate --force` + `cache:clear` (catch-up after database Import, or empty migrate)
+7. Write `last_commit`
+
+### Import (local only)
+
+`php eir/run.php -i` dumps a remote MySQL/MariaDB (`EIR_IMPORT_DB_*`) into this Environment’s `DB_*` database, then runs `migrate --force` for catch-up.
+
+`php eir/run.php -m` copies a remote Environment’s media folders (`EIR_IMPORT_SSH_*`) over SSH into this Environment. Enter the path you `cd` to after login, e.g. `production`. Remote `public_images` / `public_files` are used when `images` / `files` are absent, and land in the local `images` / `files` folders. SSH key authentication only (no password prompt). Combine with `-i` to do both.
+
+Interactive only (cannot combine with `-s`). Source settings never enter `app/.env`. Set `EIR_SYS_MYSQL` / `EIR_SYS_MYSQLDUMP` / `EIR_SYS_SSH` / `EIR_SYS_TAR` if those binaries are not on PATH.
+
+Also accepted: `-import`, `-media`, `-import-media`.
 
 ### Local (`EIR_SYS_ENV=local`, `app/` exists)
 
